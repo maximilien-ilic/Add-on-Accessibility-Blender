@@ -268,7 +268,40 @@ class NavigateButtonsOperator(bpy.types.Operator):
         
         return {'FINISHED'}
     
+# ========== OPÉRATEUR DE NAVIGATION ARRIERE ==========
 
+class UnNavigateButtonsOperator(bpy.types.Operator):
+    bl_idname = "wm.unnavigate_buttons"
+    bl_label = "UnNavigate"
+    bl_description = "Navigate backward through themes or operators"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        global current_theme_index, current_operator_index, in_theme_mode, theme_names
+        
+        if in_theme_mode:
+            # Navigation arrière dans les thèmes
+            current_theme_index = (current_theme_index - 1) % len(theme_names)
+            theme_name = theme_names[current_theme_index]
+            num_ops = len(THEMES[theme_name])
+            message = f"THÈME [{current_theme_index + 1}/{len(theme_names)}]: {theme_name} ({num_ops} opérateurs)"
+            self.report({'INFO'}, message)
+        else:
+            # Navigation arrière dans les opérateurs
+            theme_name = theme_names[current_theme_index]
+            operators = THEMES[theme_name]
+            
+            if len(operators) == 0:
+                self.report({'WARNING'}, "Aucun opérateur dans ce thème")
+                return {'CANCELLED'}
+            
+            current_operator_index = (current_operator_index - 1) % len(operators)
+            current_op = operators[current_operator_index]
+            message = f"{theme_name} [{current_operator_index + 1}/{len(operators)}]: {current_op['label']}"
+            self.report({'INFO'}, message)
+        
+        return {'FINISHED'}
+    
     # ========== OPÉRATEUR D'ACTIVATION/VALIDATION ==========
 class sd(bpy.types.Operator):
     bl_idname = "wm.activate_current_button"
