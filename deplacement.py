@@ -226,3 +226,102 @@ THEMES = {
         {"id": "screen.frame_jump", "label": "Sauter à la frame"},
     ],
 }
+
+
+# ========== VARIABLES GLOBALES ==========
+current_theme_index = 0
+current_operator_index = 0
+in_theme_mode = True  # True = navigation thèmes, False = navigation opérateurs
+theme_names = list(THEMES.keys())
+addon_keymaps = []
+
+# ========== OPÉRATEUR DE NAVIGATION ==========
+class NavigateButtonsOperator(bpy.types.Operator):
+    bl_idname = "wm.navigate_buttons"
+    bl_label = "Navigate"
+    bl_description = "Navigate through themes or operators"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        global current_theme_index, current_operator_index, in_theme_mode, theme_names
+        
+        if in_theme_mode:
+            # Navigation dans les thèmes00
+            current_theme_index = (current_theme_index + 1) % len(theme_names)
+            theme_name = theme_names[current_theme_index]
+            num_ops = len(THEMES[theme_name])
+            message = f"THÈME [{current_theme_index + 1}/{len(theme_names)}]: {theme_name} ({num_ops} opérateurs)"
+            self.report({'INFO'}, message)
+        else:
+            # Navigation dans les opérateurs du thème actuel
+            theme_name = theme_names[current_theme_index]
+            operators = THEMES[theme_name]
+            
+            if len(operators) == 0:
+                self.report({'WARNING'}, "Aucun opérateur dans ce thème")
+                return {'CANCELLED'}
+            
+            current_operator_index = (current_operator_index + 1) % len(operators)
+            current_op = operators[current_operator_index]
+            message = f"{theme_name} [{current_operator_index + 1}/{len(operators)}]: {current_op['label']}"
+            self.report({'INFO'}, message)
+        
+        return {'FINISHED'}
+    
+
+    # ========== OPÉRATEUR D'ACTIVATION/VALIDATION ==========
+class sd(bpy.types.Operator):
+    bl_idname = "wm.activate_current_button"
+    bl_label = "Activate/Enter"
+    bl_description = "Enter theme or execute operator"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        global current_theme_index, current_operator_index, in_theme_mode, theme_names
+        
+        if in_theme_mode:
+            # Entrer dans le thème sélectionné
+            in_theme_mode = False
+            current_operator_index = 0
+            theme_name = theme_names[current_theme_index]
+            operators = THEMES[theme_name]
+            
+            if len(operators) > 0:
+                message = f">>> DANS: {theme_name} [{current_operator_index + 1}/{len(operators)}]: {operators[0]['label']}"
+                self.report({'INFO'}, message)
+            else:
+                self.report({'WARNING'}, f"Thème vide: {theme_name}")
+                in_theme_mode = True
+        else:
+            # Exécuter l'opérateur sélectionné
+            theme_name = theme_names[current_theme_index]
+            operators = THEMES[theme_name]
+            
+            if current_operator_index >= len(operators):
+                self.report({'ERROR'}, "Index invalide")
+                return {'CANCELLED'}
+            
+            op_to_execute = operators[current_operator_index]
+            op_id = op_to_execute["id"]
+            
+            parts = op_id.split('.')
+            if len(parts) != 2:
+                self.report({'ERROR'}, f"Format invalide: {op_id}")
+                return {'CANCELLED'}
+            
+            category = parts[0]
+            operation = parts[1]
+            
+            try:
+                op_category = getattr(bpy.ops, category)
+                op_function = getattr(op_category, operation)
+                op_function('INVOKE_DEFAULT')
+                self.report({'INFO'}, f"✓ {op_to_execute['label']}")
+            except AttributeError:
+                self.report({'ERROR'}, f"Opérateur introuvable: {op_id}")
+                return {'CANCELLED'}
+            except RuntimeError as e:
+                self.report({'WARNING'}, f"Impossible: {e}")
+                return {'CANCELLED'}
+        
+        return {'FINISHED'}
