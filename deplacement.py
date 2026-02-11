@@ -1,3 +1,13 @@
+bl_info = {
+    "name": "Themed Button Navigator",
+    "author": "Maximilien Ilic",
+    "version": (2, 0),
+    "blender": (3, 0, 0),
+    "location": "Press ² to navigate themes/operators, Enter to select/execute, Esc to go back",
+    "description": "Navigate Blender operators organized by themes",
+    "category": "Interface",
+}
+
 import bpy
 
 # ========== OPÉRATEURS ORGANISÉS PAR THÈMES ==========
@@ -227,13 +237,13 @@ THEMES = {
     ],
 }
 
-
 # ========== VARIABLES GLOBALES ==========
 current_theme_index = 0
 current_operator_index = 0
 in_theme_mode = True  # True = navigation thèmes, False = navigation opérateurs
 theme_names = list(THEMES.keys())
 addon_keymaps = []
+
 
 # ========== OPÉRATEUR DE NAVIGATION ==========
 class NavigateButtonsOperator(bpy.types.Operator):
@@ -268,7 +278,7 @@ class NavigateButtonsOperator(bpy.types.Operator):
         
         return {'FINISHED'}
     
-# ========== OPÉRATEUR DE NAVIGATION ARRIERE ==========
+# ========== OPÉRATEUR D'ACTIVATION/VALIDATION ==========
 
 class UnNavigateButtonsOperator(bpy.types.Operator):
     bl_idname = "wm.unnavigate_buttons"
@@ -302,8 +312,8 @@ class UnNavigateButtonsOperator(bpy.types.Operator):
         
         return {'FINISHED'}
     
-    # ========== OPÉRATEUR D'ACTIVATION/VALIDATION ==========
-class sd(bpy.types.Operator):
+# ========== OPÉRATEUR DE NAVIGATION ARRIERE ==========
+class ActivateCurrentButtonOperator(bpy.types.Operator):
     bl_idname = "wm.activate_current_button"
     bl_label = "Activate/Enter"
     bl_description = "Enter theme or execute operator"
@@ -358,3 +368,92 @@ class sd(bpy.types.Operator):
                 return {'CANCELLED'}
         
         return {'FINISHED'}
+
+
+# ========== OPÉRATEUR RETOUR ARRIÈRE ==========
+class GoBackOperator(bpy.types.Operator):
+    bl_idname = "wm.go_back_theme"
+    bl_label = "Go Back"
+    bl_description = "Return to theme selection"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        global in_theme_mode, current_theme_index, theme_names
+        
+        if not in_theme_mode:
+            # Retourner à la sélection de thèmes
+            in_theme_mode = True
+            theme_name = theme_names[current_theme_index]
+            message = f"<<< RETOUR - THÈME [{current_theme_index + 1}/{len(theme_names)}]: {theme_name}"
+            self.report({'INFO'}, message)
+        else:
+            self.report({'INFO'}, "Déjà en mode thèmes")
+        
+        return {'FINISHED'}
+
+
+# ========== ENREGISTREMENT ==========
+def register():
+    bpy.utils.register_class(NavigateButtonsOperator)
+    bpy.utils.register_class(UnNavigateButtonsOperator)
+    bpy.utils.register_class(ActivateCurrentButtonOperator)
+
+    bpy.utils.register_class(GoBackOperator)
+    
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    
+    if kc:
+        km = kc.keymaps.new(name='Window', space_type='EMPTY')
+        
+        # Touche ² pour naviguer
+        kmi_navigate = km.keymap_items.new(
+            idname='wm.navigate_buttons',
+            type='QUOTE',
+            value='PRESS'
+        )
+        
+        # Touche Entrée pour valider/exécuter
+        kmi_activate = km.keymap_items.new(
+            idname='wm.activate_current_button',
+            type='RET',
+            value='PRESS'
+        )
+
+
+        # Touche ² + MAJ pour naviguer arriere 
+        kmi_unnavigate = km.keymap_items.new(
+            idname='wm.unnavigate_buttons',  
+            type='QUOTE',
+            value='PRESS',
+            shift=True
+        )
+
+
+        # Touche Échap pour retour arrière
+        kmi_back = km.keymap_items.new(
+            idname='wm.go_back_theme',
+            type='ESC',
+            value='PRESS'
+        )
+        
+        addon_keymaps.append((km, kmi_navigate))
+        addon_keymaps.append((km, kmi_activate))
+        addon_keymaps.append((km, kmi_back))
+        addon_keymaps.append((km, kmi_unnavigate))
+
+# ========== DÉSENREGISTREMENT ==========
+def unregister():
+    for km, kmi in addon_keymaps:
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear()
+    
+    bpy.utils.unregister_class(GoBackOperator)
+    bpy.utils.unregister_class(UnNavigateButtonsOperator)
+    bpy.utils.unregister_class(ActivateCurrentButtonOperator)
+    bpy.utils.unregister_class(NavigateButtonsOperator)
+
+
+# ========== POINT D'ENTRÉE ==========
+if __name__ == "__main__":
+    register()
